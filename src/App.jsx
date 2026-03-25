@@ -525,6 +525,8 @@ export default function App() {
   const [studentGoals, setStudentGoals] = useState({});
   const [studentSort, setStudentSort] = useState('custom'); // 'custom' | 'name' | 'school' | 'group'
   const [matrixSort, setMatrixSort] = useState('custom'); // 'custom' | 'name' | 'school' | 'group'
+  const [matrixSchoolFilter, setMatrixSchoolFilter] = useState('all');
+  const [matrixGroupFilter, setMatrixGroupFilter] = useState('all');
   const [confirmDelete, setConfirmDelete] = useState(null); // { coll, id, label }
   // 드래그 순서 조정
   const [dragState, setDragState] = useState({ type: null, fromId: null, overId: null });
@@ -569,13 +571,17 @@ export default function App() {
     if (userRole === 'student' && myStudentId) return students.filter(s => s.id === myStudentId);
     if (activeClassFilter !== 'all') base = students.filter(s => s.classroomId === activeClassFilter);
     else base = students;
+    // 학교/그룹 필터 적용
+    let filtered = base;
+    if (matrixSchoolFilter !== 'all') filtered = filtered.filter(s => (s.highSchool || '미설정') === matrixSchoolFilter);
+    if (matrixGroupFilter !== 'all') filtered = filtered.filter(s => (s.group || '미설정') === matrixGroupFilter);
     // matrixSort 적용
-    const sorted = [...base];
+    const sorted = [...filtered];
     if (matrixSort === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     else if (matrixSort === 'school') sorted.sort((a, b) => (a.highSchool||'').localeCompare(b.highSchool||'', 'ko') || a.name.localeCompare(b.name, 'ko'));
     else if (matrixSort === 'group') sorted.sort((a, b) => (a.group||'z').localeCompare(b.group||'z') || a.name.localeCompare(b.name, 'ko'));
     return sorted;
-  }, [students, userRole, myStudentId, activeClassFilter, matrixSort]);
+  }, [students, userRole, myStudentId, activeClassFilter, matrixSort, matrixSchoolFilter, matrixGroupFilter]);
 
   const stats = useMemo(() => {
     if (!students || students.length === 0) return { assign: {}, memo: {}, studentTestAverages: {}, testAverages: {} };
@@ -1214,6 +1220,32 @@ export default function App() {
                   )}
                   {userRole !== 'student' && (
                     <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
+                      {/* 학교 필터 */}
+                      {(() => {
+                        const schools = ['all', ...new Set(students.map(s => s.highSchool || '미설정').filter(Boolean))].sort();
+                        if (schools.length <= 2) return null;
+                        return (
+                          <select value={matrixSchoolFilter} onChange={e => setMatrixSchoolFilter(e.target.value)}
+                            className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all outline-none ${matrixSchoolFilter !== 'all' ? 'text-white border-transparent shadow-sm' : 'bg-white border-slate-200 text-slate-400'}`}
+                            style={matrixSchoolFilter !== 'all' ? {background:'var(--sc)'} : {}}>
+                            <option value="all">학교 전체</option>
+                            {schools.filter(s => s !== 'all').map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        );
+                      })()}
+                      {/* 그룹 필터 */}
+                      {(() => {
+                        const groups = ['all', ...new Set(students.map(s => s.group || '미설정').filter(Boolean))].sort();
+                        if (groups.length <= 2) return null;
+                        return (
+                          <select value={matrixGroupFilter} onChange={e => setMatrixGroupFilter(e.target.value)}
+                            className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all outline-none ${matrixGroupFilter !== 'all' ? 'text-white border-transparent shadow-sm' : 'bg-white border-slate-200 text-slate-400'}`}
+                            style={matrixGroupFilter !== 'all' ? {background:'var(--sc)'} : {}}>
+                            <option value="all">그룹 전체</option>
+                            {groups.filter(g => g !== 'all').map(g => <option key={g} value={g}>{g === '미설정' ? '그룹 미설정' : `그룹 ${g}`}</option>)}
+                          </select>
+                        );
+                      })()}
                       {/* 정렬 */}
                       <div className="flex items-center gap-1">
                         {[
@@ -1229,6 +1261,13 @@ export default function App() {
                           </button>
                         ))}
                       </div>
+                      {/* 필터 초기화 */}
+                      {(matrixSchoolFilter !== 'all' || matrixGroupFilter !== 'all') && (
+                        <button onClick={() => { setMatrixSchoolFilter('all'); setMatrixGroupFilter('all'); }}
+                          className="px-2.5 py-1.5 rounded-xl text-[10px] font-black border border-red-200 text-red-400 bg-white hover:bg-red-50 transition-all">
+                          초기화
+                        </button>
+                      )}
                       <button onClick={() => setMatrixHideDone(v => !v)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all ${matrixHideDone ? 'bg-blue-500 text-white border-blue-500 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}>
                         <CheckCircle2 size={12}/>{matrixHideDone ? '완료 숨김 중' : '완료 숨기기'}
