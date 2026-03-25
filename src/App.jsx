@@ -523,6 +523,8 @@ export default function App() {
   const [editingClassrooms, setEditingClassrooms] = useState(false);
   const [classroomInput, setClassroomInput] = useState("");
   const [studentGoals, setStudentGoals] = useState({});
+  const [studentSort, setStudentSort] = useState('custom'); // 'custom' | 'name' | 'school' | 'group'
+  const [confirmDelete, setConfirmDelete] = useState(null); // { coll, id, label }
   // 드래그 순서 조정
   const [dragState, setDragState] = useState({ type: null, fromId: null, overId: null });
   const [testSectionCollapsed, setTestSectionCollapsed] = useState({ main: false, mini: false });
@@ -2644,8 +2646,32 @@ export default function App() {
                   }} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all leading-none">등록하기</button>
                 </div>
               )}
+              {/* 정렬 옵션 - master/teacher */}
+              {userRole !== 'student' && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">정렬</span>
+                  {[
+                    { id: 'custom', label: '직접 설정' },
+                    { id: 'name', label: '가나다순' },
+                    { id: 'school', label: '학교별' },
+                    { id: 'group', label: '그룹별' },
+                  ].map(opt => (
+                    <button key={opt.id} onClick={() => setStudentSort(opt.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all ${studentSort === opt.id ? 'text-white border-transparent shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                      style={studentSort === opt.id ? {background:'var(--sc)'} : {}}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {students.map(s => (
+                {(() => {
+                  let sorted = [...students];
+                  if (studentSort === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+                  else if (studentSort === 'school') sorted.sort((a, b) => (a.highSchool||'').localeCompare(b.highSchool||'', 'ko') || a.name.localeCompare(b.name, 'ko'));
+                  else if (studentSort === 'group') sorted.sort((a, b) => (a.group||'z').localeCompare(b.group||'z') || a.name.localeCompare(b.name, 'ko'));
+                  return sorted;
+                })().map(s => (
                   <div key={s.id}
                     draggable={userRole === 'master' && !editStudentId}
                     onDragStart={() => setDragState({ type: 'student', fromId: s.id, overId: null })}
@@ -2828,13 +2854,13 @@ export default function App() {
                         {userRole === 'master' && (
                           <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0 leading-none">
                             <button onClick={() => { setEditStudentId(s.id); setEditStudentData({ name: s.name, studentCode: s.studentCode || '', homeroomTeacher: s.homeroomTeacher || '', highSchool: s.highSchool || '', group: s.group || '', classroomId: s.classroomId || '' }); }} className="p-2 text-indigo-500 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all shadow-sm leading-none"><Edit2 size={18} /></button>
-                            <button onClick={() => deleteItem('students', s.id)} className="p-2 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm leading-none"><Trash2 size={18} /></button>
+                            <button onClick={() => setConfirmDelete({ coll: 'students', id: s.id, label: s.name })} className="p-2 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm leading-none"><Trash2 size={18} /></button>
                           </div>
                         )}
                       </div>
                     )}
                   </div>
-                ))}
+                ))})()}
               </div>
             </div>
           )}
@@ -5094,6 +5120,33 @@ export default function App() {
           </div>
         )}
         {/* 일괄 처리 날짜 선택 팝업 */}
+        {/* 삭제 확인 모달 */}
+        {confirmDelete && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setConfirmDelete(null)}>
+            <div className="bg-white rounded-3xl shadow-2xl p-7 w-full max-w-sm text-center animate-in zoom-in-95 duration-200"
+              onClick={e => e.stopPropagation()}>
+              <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={26} className="text-red-500"/>
+              </div>
+              <p className="text-lg font-black text-slate-800 mb-1">정말 삭제할까요?</p>
+              <p className="text-sm text-slate-500 font-medium mb-6">
+                <span className="font-black text-slate-700">{confirmDelete.label}</span> 학생을 삭제하면<br/>복구할 수 없습니다.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setConfirmDelete(null)}
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-2xl font-black transition-all hover:bg-slate-200">
+                  취소
+                </button>
+                <button onClick={async () => { await deleteItem(confirmDelete.coll, confirmDelete.id); setConfirmDelete(null); }}
+                  className="flex-1 py-3 bg-red-500 text-white rounded-2xl font-black shadow-lg hover:bg-red-600 transition-all active:scale-95">
+                  삭제
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {bulkDatePopup && (
           <div className="fixed inset-0 z-[160] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => { setBulkDatePopup(null); setBulkSelectedStatus(null); }}>
             <div className="bg-white rounded-[2rem] shadow-2xl p-5 md:p-8 w-full max-w-xs animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
