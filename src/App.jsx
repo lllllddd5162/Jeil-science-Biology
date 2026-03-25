@@ -524,6 +524,7 @@ export default function App() {
   const [classroomInput, setClassroomInput] = useState("");
   const [studentGoals, setStudentGoals] = useState({});
   const [studentSort, setStudentSort] = useState('custom'); // 'custom' | 'name' | 'school' | 'group'
+  const [matrixSort, setMatrixSort] = useState('custom'); // 'custom' | 'name' | 'school' | 'group'
   const [confirmDelete, setConfirmDelete] = useState(null); // { coll, id, label }
   // 드래그 순서 조정
   const [dragState, setDragState] = useState({ type: null, fromId: null, overId: null });
@@ -564,10 +565,17 @@ export default function App() {
 
   // --- Logic Hooks ---
   const visibleStudentsFiltered = useMemo(() => {
+    let base;
     if (userRole === 'student' && myStudentId) return students.filter(s => s.id === myStudentId);
-    if (activeClassFilter !== 'all') return students.filter(s => s.classroomId === activeClassFilter);
-    return students;
-  }, [students, userRole, myStudentId, activeClassFilter]);
+    if (activeClassFilter !== 'all') base = students.filter(s => s.classroomId === activeClassFilter);
+    else base = students;
+    // matrixSort 적용
+    const sorted = [...base];
+    if (matrixSort === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    else if (matrixSort === 'school') sorted.sort((a, b) => (a.highSchool||'').localeCompare(b.highSchool||'', 'ko') || a.name.localeCompare(b.name, 'ko'));
+    else if (matrixSort === 'group') sorted.sort((a, b) => (a.group||'z').localeCompare(b.group||'z') || a.name.localeCompare(b.name, 'ko'));
+    return sorted;
+  }, [students, userRole, myStudentId, activeClassFilter, matrixSort]);
 
   const stats = useMemo(() => {
     if (!students || students.length === 0) return { assign: {}, memo: {}, studentTestAverages: {}, testAverages: {} };
@@ -1205,7 +1213,22 @@ export default function App() {
                     </div>
                   )}
                   {userRole !== 'student' && (
-                    <div className="ml-auto">
+                    <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
+                      {/* 정렬 */}
+                      <div className="flex items-center gap-1">
+                        {[
+                          { id: 'custom', label: '기본' },
+                          { id: 'name', label: '가나다' },
+                          { id: 'school', label: '학교' },
+                          { id: 'group', label: '그룹' },
+                        ].map(opt => (
+                          <button key={opt.id} onClick={() => setMatrixSort(opt.id)}
+                            className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all ${matrixSort === opt.id ? 'text-white border-transparent shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}
+                            style={matrixSort === opt.id ? {background:'var(--sc)'} : {}}>
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
                       <button onClick={() => setMatrixHideDone(v => !v)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all ${matrixHideDone ? 'bg-blue-500 text-white border-blue-500 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}>
                         <CheckCircle2 size={12}/>{matrixHideDone ? '완료 숨김 중' : '완료 숨기기'}
